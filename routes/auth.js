@@ -1,6 +1,8 @@
 const {Router} = require('express')
 const bcrypt = require('bcryptjs')
+const jwt = require('jsonwebtoken')
 const router = Router()
+const config = require('config')
 const User = require('../models/User')
 const {check, validationResult} = require('express-validator')
 
@@ -46,7 +48,11 @@ router.post(
 })
 
 router.post(
-    '/register', 
+    '/login', 
+    [
+        check('email', 'Введи нормальное мыло!!').normalizeEmail().isEmail(),
+        check('password', 'Введи пароль блеать!!').exists()
+    ]
     [
         check('email', 'Введи нормальное мыло.. лупень!').normalizeEmail().isEmail(),
         check('password', 'Пароль введи!!!').exists()
@@ -61,7 +67,28 @@ router.post(
                     message: 'Ты ввел херовые данные .... олень!'
                 })
             }
-    
+            
+            const {email, password} = req.body
+
+            const user = await User.findOne({email})
+
+            if(!user) {
+                return res.status(400).json({message: 'Этого долбанного юзера нет!!'})
+            }
+
+            const isMatch = await bcrypt.compare(password, user.password)
+
+            if (!isMatch) {
+                return res.status(400).json({message: 'Херовый пароль! Попробуй снова, рукожоп!'})
+            }
+
+            const token = jwt.sign(
+                {userId: user.id},
+                config.get('jwtSecret'),
+                {expiresIn: '1h'}
+            )
+
+            res.json({token, userId: user.id})
             
         }
         catch(e) {
